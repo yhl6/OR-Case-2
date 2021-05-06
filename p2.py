@@ -1,10 +1,7 @@
 from gurobipy import *
-import numpy as np
 import pandas as pd
 from pathlib import Path
 
-# def find_vendor_price(Vendor_product, Vendor_cost):
-#
 '''
 讀取資料
 '''
@@ -43,6 +40,8 @@ Backorder_percentage = Shortage['Backorder percentage']  # 願意繼續等的機
 
 # 其他資料
 Vendor_product = pd.read_excel(df, sheet_name='Vendor-Product', index_col=0)
+ProductID_grouped = Vendor_product.groupby('Vendor')
+
 Vendor_cost = pd.read_excel(df, sheet_name='Vendor cost', index_col=0)
 
 Bounds = pd.read_excel(df, sheet_name='Bounds', index_col=0)
@@ -62,12 +61,15 @@ Shipping_method = range(1, 4)
 VendorID = range(1, R + 1)
 ConflictID = range(1, J + 1)
 
+# TD[i] = Total demand for product i
+Total_demand = Demand.apply(lambda x: x.sum(), axis=1)
+
 # 模型的部分
 p2 = Model("p2")
 
 # Non-binary Variables
 x = p2.addVars(ProductID, Shipping_method, MonthID, lb=0, vtype=GRB.INTEGER, name='x')  # x[i, k, t]
-y = p2.addVars(ProductID, MonthID, lb=-1000000000000, vtype=GRB.INTEGER, name='y')  # y 期末存貨 (現在有分正負)
+y = p2.addVars(ProductID, MonthID, vtype=GRB.INTEGER, name='y')  # y 期末存貨 (有分正負)
 g = p2.addVars(MonthID, lb=0, vtype=GRB.INTEGER, name='g')  # 高斯符號
 yp = p2.addVars(ProductID, MonthID, lb=0, vtype=GRB.INTEGER, name='yp')  # 期末存貨為正時的值
 yn = p2.addVars(ProductID, MonthID, lb=0, vtype=GRB.INTEGER, name='yn')  # 期末存貨為負時(未滿足需求)時的值
@@ -78,27 +80,12 @@ d = p2.addVars(ProductID, MonthID, lb=0, vtype=GRB.BINARY,
                name='d')  # d[i, t] = 1 if the amount of y[i, t] is positive or = 0 otherwise.
 a = p2.addVars(ProductID, MonthID, lb=0, vtype=GRB.BINARY,
                name='a')  # a[i, t] = 1 if product i is ordered in month t or = 0 otherwise.
-o = p2.addVars(VendorID, lb=0, vtype=GRB.BINARY, name='o')  # o[i, t] = 1 if we order any product from vendor r
+o = p2.addVars(VendorID, MonthID, lb=0, vtype=GRB.BINARY, name='o')  # o[r, t] = 1 if we order any product from vendor r
 
 # 更新變數
 p2.update()
 
-# 目標變數
-# p2.setObjective(
-#     quicksum(Express_delivery[i] * quicksum(x[i, 1, t] for t in MonthID) for i in ProductID)  # 變動成本
-#     + quicksum(Air_freight[i] * quicksum(x[i, 2, t] for t in MonthID) for i in ProductID)
-#     + quicksum(Fixed_cost[k - 1] * quicksum(z[k, t] for t in MonthID) for k in Shipping_method)  # 固定成本
-#     + quicksum(
-#         Purchasing_cost[i] * quicksum(x[i, k, t] for k in Shipping_method for t in MonthID) for i in ProductID)  # 購買成本
-#     + quicksum(Holding_cost[i] * quicksum(yp[i, t] * d[i, t] for t in MonthID) for i in ProductID)
-#     + quicksum(g[t] * 2750 for t in MonthID)
-#     + quicksum(
-#         Lost_sales[i] * quicksum(yn[i, t] * (1 - d[i, t]) * (1 - Backorder_percentage[i]) for t in MonthID) for i in
-#         ProductID)
-#     + quicksum(
-#         Backorder[i] * quicksum(yn[i, t] * (1 - d[i, t]) * Backorder_percentage[i] for t in MonthID) for i in ProductID)
-#     + quicksum(Vendor_cost.loc[r, 'Ordering cost'] * o[r] for r in VendorID), GRB.MINIMIZE)
-
+# 目標式
 p2.setObjective(
     quicksum(Express_delivery[i] * quicksum(x.select('*', 1, '*')) for i in ProductID)  # 變動成本
     + quicksum(Air_freight[i] * quicksum(x.select('*', 2, '*')) for i in ProductID)
@@ -112,7 +99,8 @@ p2.setObjective(
         ProductID)
     + quicksum(
         Backorder[i] * quicksum(yn[i, t] * (1 - d[i, t]) * Backorder_percentage[i] for t in MonthID) for i in ProductID)
-    + quicksum(Vendor_cost.loc[r, 'Ordering cost'] * o[r] for r in VendorID), GRB.MINIMIZE)
+    + quicksum(Vendor_cost.loc[r, 'Ordering cost'] * quicksum(o[r, t] for t in MonthID) for r in VendorID), GRB.MINIMIZE)
+
 
 # 限制式
 
@@ -135,35 +123,27 @@ for t in MonthID:
 
 # Y的binary constraint
 p2.addConstrs(d[i, t] <= yp[i, t] for i in ProductID for t in MonthID)
-
-# inventory constraint (yp >= 0? yn >= 0?)
 p2.addConstrs(yp[i, t] >= y[i, t] for i in ProductID for t in MonthID)
 p2.addConstrs(yp[i, t] <= y[i, t] * d[i, t] for i in ProductID for t in MonthID)
 p2.addConstrs(yn[i, t] >= -y[i, t] for i in ProductID for t in MonthID)
 p2.addConstrs(yn[i, t] <= -y[i, t] * (1 - d[i, t]) for i in ProductID for t in MonthID)
 
-# ceiling constraint
-p2.addConstrs(g[t] >= quicksum(Cubic_meter[i] * x[i, 3, t] for i in ProductID) / 30 for t in MonthID)
+# ceiling constraints
+p2.addConstrs((g[t] >= quicksum(Cubic_meter[i] * x[i, 3, t] for i in ProductID) / 30) for t in MonthID)
 p2.addConstrs(
-    g[t] <= quicksum(Cubic_meter[i] * x[i, 3, t] for i in ProductID) / 30 + 0.999999999999999999 for t in MonthID)
+    (g[t] <= quicksum(Cubic_meter[i] * x[i, 3, t] for i in ProductID) / 30 + 0.999999999999999999) for t in MonthID)
 
 # conflict constraint
 p2.addConstrs((a[i, t] + a[j, t] <= 1) for i, j in Conflict_tl for t in MonthID)
+print(ProductID_grouped.groups)
+# o[r, t] constraints
+for r in VendorID:
+    for t in MonthID:
+        pass
+        # p2.addConstr(quicksum(x.select(i, '*', t)) for i in range(ProductID_grouped.groups[r][0], ProductID_grouped.groups[r][-1] + 1) >= quicksum(Total_demand[i] - Initial_inv[i] for i in ProductID))
 
 # Lower Bound constraint
-p2.addConstrs(quicksum(x.select(i, '*', t)) >= Lower_bound[i] * a[i, t] for i in ProductID for t in MonthID)
-p2.addConstrs(quicksum(x.select(i, '*', t)) <= quicksum(Demand.loc[i]) for i in ProductID for t in MonthID)
+p2.addConstrs((quicksum(x.select(i, '*', t)) >= Lower_bound[i] * a[i, t]) for i in ProductID for t in MonthID)
+p2.addConstrs((quicksum(x.select(i, '*', t)) <= Total_demand[i] - Initial_inv[i]) for i in ProductID for t in MonthID)
 
-
-'''
-p2.addConstrs((y[i, 1] == Initial_Inventory[i] - Demandlist[i, 1] for i in ProductID), 'March')
-p2.addConstrs((y[i, 2] == yp[i, 1]*d[i, 1] - yn[i, 1]*Backorder_percentage[i] + x[i, 1][0] - Demandlist[i, 2] + April_intransit[i] for i in ProductID), 'April')
-p2.addConstrs((y[i][2] == yp[i, 2]*d[i, 2] - yn[i, 2]*Backorder_percentage[i] + x[i, 1][1] + x[i, 2][0] - Demandlist[i][2] + May_intransit[i] for i in ProductID),
-               'May')
-p2.addConstrs((y[i, t] == yp[i][t - 1]*d[i][t-1] - yn[i][t-1]*(1-d[i][t-1])*Backorder_percentage[i] + quicksum(x[i][k][t - k -1] for k in Shipping_method) - Demandlist[i, t]
-              for i in ProductID for t in range(3, 6)), "ending inventory")
-
-
-'''
 # p2.optimize()
-
