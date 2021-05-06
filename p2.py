@@ -1,4 +1,5 @@
 from gurobipy import *
+import numpy as np
 import pandas as pd
 from pathlib import Path
 
@@ -43,6 +44,7 @@ Vendor_product = pd.read_excel(df, sheet_name='Vendor-Product', index_col=0)
 ProductID_grouped = Vendor_product.groupby('Vendor')
 
 Vendor_cost = pd.read_excel(df, sheet_name='Vendor cost', index_col=0)
+Ordering_cost = Vendor_cost['Ordering cost']
 
 Bounds = pd.read_excel(df, sheet_name='Bounds', index_col=0)
 Lower_bound = Bounds['Minimum order quantity (if an order is placed)']
@@ -86,20 +88,29 @@ o = p2.addVars(VendorID, MonthID, lb=0, vtype=GRB.BINARY, name='o')  # o[r, t] =
 p2.update()
 
 # 目標式
+# print(
+#         Lost_sales[1] * quicksum(yn[1, t] * (1 - d[1, t]) * (1 - Backorder_percentage[1]) for t in MonthID))
 p2.setObjective(
-    quicksum(Express_delivery[i] * quicksum(x.select('*', 1, '*')) for i in ProductID)  # 變動成本
-    + quicksum(Air_freight[i] * quicksum(x.select('*', 2, '*')) for i in ProductID)
+    quicksum(Express_delivery[i] * quicksum(x.select(i, 1, '*')) for i in ProductID)  # 變動成本
+    + quicksum(Air_freight[i] * quicksum(x.select(i, 2, '*')) for i in ProductID)
     + quicksum(Fixed_cost[k - 1] * quicksum(z.select(k, '*')) for k in Shipping_method)  # 固定成本
     + quicksum(
         Purchasing_cost[i] * quicksum(x.select(i, '*', '*')) for i in ProductID)  # 購買成本
-    + quicksum(Holding_cost[i] * quicksum(yp[i, t] * d[i, t] for t in MonthID) for i in ProductID)
-    + quicksum(g.select() * 2750)
+    # + quicksum(Holding_cost[i] * quicksum(yp[i, t] * d[i, t] for t in MonthID) for i in ProductID)
+    # + 2750 * quicksum(g.select())
+    # + quicksum(
+    #     Lost_sales[i] * quicksum(yn[i, t] * (1 - d[i, t]) * (1 - Backorder_percentage[i]) for t in MonthID) for i in
+    #     ProductID)
+    # + quicksum(
+    #     Backorder[i] * quicksum(yn[i, t] * (1 - d[i, t]) * Backorder_percentage[i] for t in MonthID) for i in ProductID)
+    + quicksum(Holding_cost[i] * quicksum(yp[i, t] for t in MonthID) for i in ProductID)
+    + 2750 * quicksum(g.select())
     + quicksum(
-        Lost_sales[i] * quicksum(yn[i, t] * (1 - d[i, t]) * (1 - Backorder_percentage[i]) for t in MonthID) for i in
+        Lost_sales[i] * quicksum(yn[i, t] * (1 - Backorder_percentage[i]) for t in MonthID) for i in
         ProductID)
     + quicksum(
-        Backorder[i] * quicksum(yn[i, t] * (1 - d[i, t]) * Backorder_percentage[i] for t in MonthID) for i in ProductID)
-    + quicksum(Vendor_cost.loc[r, 'Ordering cost'] * quicksum(o[r, t] for t in MonthID) for r in VendorID), GRB.MINIMIZE)
+        Backorder[i] * quicksum(yn[i, t] * Backorder_percentage[i] for t in MonthID) for i in ProductID)
+    + quicksum(Ordering_cost[r] * quicksum(o[r, t] for t in MonthID) for r in VendorID), GRB.MINIMIZE)
 
 
 # 限制式
@@ -122,28 +133,41 @@ for t in MonthID:
             Initial_inv[i] for i in ProductID)) * z[k, t], 'Z constraint')
 
 # Y的binary constraint
+for i in ProductID:
+    for t in MonthID:
+        p2.addConstr(d[i, t] <= yp[i, t])
+        p2.addConstr(yp[i, t] >= y[i, t])
+        p2.addConstr(yp[i, t] <= y[i, t] * d[i, t])
+        p2.addConstr(yn[i, t] >= -y[i, t])
+        p2.addConstr(yn[i, t] <= -y[i, t] * (1 - d[i, t]))
+'''
 p2.addConstrs(d[i, t] <= yp[i, t] for i in ProductID for t in MonthID)
 p2.addConstrs(yp[i, t] >= y[i, t] for i in ProductID for t in MonthID)
 p2.addConstrs(yp[i, t] <= y[i, t] * d[i, t] for i in ProductID for t in MonthID)
 p2.addConstrs(yn[i, t] >= -y[i, t] for i in ProductID for t in MonthID)
 p2.addConstrs(yn[i, t] <= -y[i, t] * (1 - d[i, t]) for i in ProductID for t in MonthID)
-
+'''
 # ceiling constraints
 p2.addConstrs((g[t] >= quicksum(Cubic_meter[i] * x[i, 3, t] for i in ProductID) / 30) for t in MonthID)
 p2.addConstrs(
     (g[t] <= quicksum(Cubic_meter[i] * x[i, 3, t] for i in ProductID) / 30 + 0.999999999999999999) for t in MonthID)
 
 # conflict constraint
-p2.addConstrs((a[i, t] + a[j, t] <= 1) for i, j in Conflict_tl for t in MonthID)
-print(ProductID_grouped.groups)
+for i, j in Conflict_tl:
+    for t in MonthID:
+        p2.addConstr((a[i, t] + a[j, t] <= 1))
+
+# p2.addConstrs((a[i, t] + a[j, t] <= 1) for i, j in Conflict_tl for t in MonthID)
 # o[r, t] constraints
 for r in VendorID:
     for t in MonthID:
-        pass
+        for i in [ProductID_grouped.groups[r]]:
+            p2.addConstr((quicksum(x.select(i, '*', t))) <= (quicksum(Total_demand[i] - Initial_inv[i]) * o[r, t]))
+            p2.addConstr((quicksum(x.select(i, '*', t))) >= o[r, t])
         # p2.addConstr(quicksum(x.select(i, '*', t)) for i in range(ProductID_grouped.groups[r][0], ProductID_grouped.groups[r][-1] + 1) >= quicksum(Total_demand[i] - Initial_inv[i] for i in ProductID))
 
 # Lower Bound constraint
 p2.addConstrs((quicksum(x.select(i, '*', t)) >= Lower_bound[i] * a[i, t]) for i in ProductID for t in MonthID)
 p2.addConstrs((quicksum(x.select(i, '*', t)) <= Total_demand[i] - Initial_inv[i]) for i in ProductID for t in MonthID)
 
-# p2.optimize()
+p2.optimize()
