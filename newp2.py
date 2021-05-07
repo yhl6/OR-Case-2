@@ -1,10 +1,16 @@
 from gurobipy import *
 import pandas as pd
 from pathlib import Path
+import numpy as np
 import time
+import locale
+
+pd.set_option('display.max_columns', None, 'display.max_rows', None)
+locale.setlocale( locale.LC_ALL, '' )
 '''
 讀取資料
 '''
+
 start = time.time()
 DATA_PATH = Path(__file__).resolve().parent / 'data'
 file_name = DATA_PATH / 'OR109-2_case02_data_s1.xlsx'
@@ -93,7 +99,7 @@ p2.setObjective(
     + quicksum(Fixed_cost[k - 1] * quicksum(z.select(k, '*')) for k in Shipping_method)  # 固定成本
     + quicksum(Purchasing_cost[i] * quicksum(x.select(i, '*', '*')) for i in ProductID)  # 購買成本
     + quicksum(Holding_cost[i] * quicksum(v[i, t] for t in MonthID) for i in ProductID)  # 倉儲成本
-    + 2750 * quicksum(g.select())  # 貨櫃成本
+    + 1500 * quicksum(g.select())  # 貨櫃成本
     + quicksum(quicksum(Lost_sales[i] * s[i, t] * (1 - Backorder_percentage[i]) for i in ProductID) for t in MonthID)  # Lost sales cost
     + quicksum(quicksum(Backorder[i] * Backorder_percentage[i] * s[i, t] for i in ProductID) for t in MonthID)  # Backorder cost
     + quicksum(Ordering_cost[r] * quicksum(o[r, t] for t in MonthID) for r in VendorID), GRB.MINIMIZE)  # Vendor cost
@@ -132,7 +138,7 @@ for i in ProductID:
 
 # ceiling constraints
 for t in MonthID:
-    p2.addConstr(g[t] >= quicksum(Cubic_meter[i] * x[i, 3, t] for i in ProductID) / 30)
+    p2.addConstr(g[t] >= quicksum(Cubic_meter[i] * x[i, 3, t] for i in ProductID) / 0.5)
 
 # conflict constraint
 for i, j in Conflict_tl:
@@ -150,6 +156,32 @@ p2.addConstrs((quicksum(x.select(i, '*', t)) >= Lower_bound[i] * a[i, t]) for i 
 p2.addConstrs((quicksum(x.select(i, '*', t)) <= Total_demand * a[i, t]) for i in ProductID for t in MonthID)
 
 p2.optimize()
+
+# print(f's{num}\'s objVal: {locale.currency(p2.objVal, grouping=True)}')
 print(p2.objVal)
-end = time.time()
-print(end - start)
+
+
+arr = []
+arr1 = []
+for i in range(1, M + 1):
+    for j in range(3):
+        arr1.append(str(i))
+arr = [arr1, ['E', 'A', 'O'] * M]
+tuples = list(zip(*arr))
+# print(tuples)
+index = pd.MultiIndex.from_tuples(tuples, names=['Month', 'Method'])
+
+sol_df = pd.DataFrame(np.nan, index=[*range(1, N + 1)], columns=index)
+
+
+for i in ProductID:
+    for t in MonthID:
+        for k in Shipping_method:
+            if k == 1:
+                sol_df.loc[i, (str(t), 'E')] = x[i, k, t].x
+            elif k == 2:
+                sol_df.loc[i, (str(t), 'A')] = x[i, k, t].x
+            elif k == 3:
+                sol_df.loc[i, (str(t), 'O')] = x[i, k, t].x
+
+print(sol_df)
