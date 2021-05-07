@@ -14,13 +14,18 @@
 import pandas as pd
 import numpy as np
 
-pd.set_option('display.max_columns', None)
-arr = [['a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'c'], ['E', 'A', 'O'] * 3]
+def add(x, y):
+    print(x + y - 2)
 
-tuples = list(zip(*arr))
+print('hi')
 
-index = pd.MultiIndex.from_tuples(tuples, names=['first', 'second'])
+# pd.set_option('display.max_columns', None)
+# arr = [['a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'c'], ['E', 'A', 'O'] * 3]
 
-df = pd.DataFrame([[*range(1, 10)], [*range(4, 13)], [*range(10, 19)]], index=['A', 'B', 'C'], columns=index)
-print(df)
-print(df.loc['A', ('a', 'O')])
+# tuples = list(zip(*arr))
+#
+# index = pd.MultiIndex.from_tuples(tuples, names=['first', 'second'])
+
+# df = pd.DataFrame([[*range(1, 10)], [*range(4, 13)], [*range(10, 19)]], index=['A', 'B', 'C'], columns=index)
+# print(df)
+# print(df.loc['A', ('a', 'O')])
