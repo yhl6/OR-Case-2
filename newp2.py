@@ -6,11 +6,11 @@ import time
 import locale
 
 pd.set_option('display.max_columns', None, 'display.max_rows', None)
-locale.setlocale( locale.LC_ALL, '' )
+# locale.setlocale( locale.LC_ALL, '' )
 '''
 讀取資料
 '''
-for num in [1]:
+for num in [2]:
     start = time.time()
     DATA_PATH = Path(__file__).resolve().parent / 'data'
     file_name = DATA_PATH / f'OR109-2_case02_data_s{num}.xlsx'
@@ -160,33 +160,29 @@ for num in [1]:
     # print(f's{num}\'s objVal: {locale.currency(p2.objVal, grouping=True)}')
     print(p2.objVal)
 
-
-    arr = []
-    arr1 = []
-    for i in range(1, M + 1):
-        for j in range(3):
-            arr1.append(str(i))
-    arr = [arr1, ['E', 'A', 'O'] * M]
-    tuples = list(zip(*arr))
     row_index = pd.Index([*range(1, N + 1)], name='Product')
-    # print(tuples)
-    index = pd.MultiIndex.from_tuples(tuples, names=['Month', 'Method'])
-    new_index = pd.MultiIndex.from_product([MonthID, ['E', 'A', 'O']], names=['Month', 'Method'])
+    column_names = pd.MultiIndex.from_product([MonthID, ['E', 'A', 'O']], names=['Month', 'Method'])
     # print(index)
     # print(new_index)
-    sol_df = pd.DataFrame(np.nan, index=[*range(1, N + 1)], columns=index)
-    sol_df = pd.DataFrame(np.nan, index=row_index, columns=index)
+    sol_df = pd.DataFrame(np.nan, index=row_index, columns=column_names)
+    # sol_df = pd.DataFrame(np.nan, index=row_index, columns=index)
     # sol_df.index.name = 'Product'
 
     for i in ProductID:
         for t in MonthID:
             for k in Shipping_method:
                 if k == 1:
-                    sol_df.loc[i, (str(t), 'E')] = x[i, k, t].x
+                    sol_df.loc[i, (t, 'E')] = x[i, k, t].x
                 elif k == 2:
-                    sol_df.loc[i, (str(t), 'A')] = x[i, k, t].x
+                    sol_df.loc[i, (t, 'A')] = x[i, k, t].x
                 elif k == 3:
-                    sol_df.loc[i, (str(t), 'O')] = x[i, k, t].x
-    print(p2.objVal)
+                    sol_df.loc[i, (t, 'O')] = x[i, k, t].x
     # print(sol_df)
     # sol_df.to_excel(f'Result_{num}.xlsx', sheet_name='Ordering Plan')
+    # for k in Shipping_method:
+    #     for t in MonthID:
+    #         if z[k, t].x != 0:
+    #             print(f'z[{k}, {t}]: {z[k, t].x}')
+
+    # for r in VendorID:
+    #     print(r, Ordering_cost[r] * (26 - quicksum((val.x for val in o.select(r, '*')))))

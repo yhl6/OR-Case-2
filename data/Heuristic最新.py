@@ -1,17 +1,14 @@
-from gurobipy import *
 import pandas as pd
 import time
 import math
 
 
 def heuristic_algorithm(file_path,n):
-
 	start = time.time()
-	local_time = time.ctime(start)
-	df = pd.read_excel(file_path)
+	df = pd.ExcelFile(file_path)
 	
 	#需求
-	Demand_info = pd.read_excel(file_path, 'Demand')
+	Demand_info = pd.read_excel(df, 'Demand')
 	Demandlist = []
 	for i in Demand_info.index:
 		Demandlist.append(list(Demand_info.loc[i]))
@@ -26,46 +23,46 @@ def heuristic_algorithm(file_path,n):
 	MonthID = range(0, 26)
 
 	# 初始存貨
-	Initial_Inv = pd.read_excel(file_path, 'Initial inventory')
+	Initial_Inv = pd.read_excel(df, 'Initial inventory')
 	Initial_Inventory = Initial_Inv['Initial inventory']
 	#print(Initial_Inventory)
 
 	# 運送費用
-	Shipping_Cost = pd.read_excel(file_path, 'Shipping cost')
+	Shipping_Cost = pd.read_excel(df, 'Shipping cost')
 	Express_delivery = Shipping_Cost['Express delivery']
 	Air_freight = Shipping_Cost['Air freight']
 	Fixed_cost = [100, 80, 50]
 
 	# 在途存貨
-	In_transit = pd.read_excel(file_path, 'In-transit')
+	In_transit = pd.read_excel(df, 'In-transit')
 	April_intransit = In_transit[2]
 	May_intransit = In_transit[3]
 
 	# 箱子大小(第二題)
-	Size = pd.read_excel(file_path, 'Size')
+	Size = pd.read_excel(df, 'Size')
 	Cubic_meter = Size['Size']
 
 	# 售價、購買成本、期末持有成本
-	Price_info = pd.read_excel(file_path, 'Price and cost')
+	Price_info = pd.read_excel(df, 'Price and cost')
 	Sales = Price_info['Sales price']
 	Purchasing_cost = Price_info['Purchasing cost']
 	Holding_cost = Price_info['Holding cost']
 
 	# Shortage & Backorder
-	Shortage = pd.read_excel(file_path,'Shortage')
+	Shortage = pd.read_excel(df,'Shortage')
 	Backorder = Shortage['Backorder'] # 0.05 p_i
 	Lost_sales = Shortage['Lost sales'] # 機會成本
 	Backorder_percentage = Shortage['Backorder percentage'] # 願意繼續等的機率
 
 	# Bounds & Vendor
-	Bounds = pd.read_excel(file_path,'Bounds')
+	Bounds = pd.read_excel(df,'Bounds')
 	Minimum_order = Bounds['Minimum order quantity (if an order is placed)']
-	Vendor_product = pd.read_excel(file_path,'Vendor-Product')
-	VendorC = pd.read_excel(file_path,'Vendor cost')
+	Vendor_product = pd.read_excel(df,'Vendor-Product')
+	VendorC = pd.read_excel(df,'Vendor cost')
 	Vendor_cost = VendorC['Ordering cost']
 
 	# Conflict 產品1,2
-	Conflict = pd.read_excel(file_path, 'Conflict')
+	Conflict = pd.read_excel(df, 'Conflict')
 	Conflict_product = Conflict[['Product 1','Product 2']]
 
 
