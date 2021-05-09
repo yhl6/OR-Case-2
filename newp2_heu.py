@@ -1,7 +1,6 @@
 from gurobipy import *
 import pandas as pd
 from pathlib import Path
-import numpy as np
 import time
 import locale
 
@@ -11,7 +10,8 @@ ariels = [1292803813.469, 172446584.464, 581302506.955, 923810132.627, 115341876
 '''
 讀取資料
 '''
-for num in [5]:
+
+def heuristic_algorithm(num):
     start = time.time()
     DATA_PATH = Path(__file__).resolve().parent / 'data'
     file_name = DATA_PATH / f'OR109-2_case02_data_s{num}.xlsx'
@@ -177,66 +177,65 @@ for num in [5]:
                 #     sol_df.loc[i, (t, 'E')] = Demand.loc[i, t + 1]
                 # elif (Lb[i] >= Demand.loc[i, t + 1] + 100):  # 如果沒有低於下限很多就訂到下限(如果低於下限很多就乾脆不訂)
                 #     sol_df.loc[i, (t, 'E')] = Lb[i]
-    for j in (488, 509):
-        conflict_1 = 488 #Conflict.loc[j, 'Product 1']
-        conflict_2 = 509 #Conflict.loc[j, 'Product 2']
-        for t in [9]:
-            # if sum(sol_df.loc[conflict_1, t]) * sum(sol_df.loc[conflict_2, t]) != 0:
+    # sol_df.to_excel('Before.xlsx')
+    for j in ConflictID:
+        conflict_1 = Conflict.loc[j, 'Product 1']
+        conflict_2 = Conflict.loc[j, 'Product 2']
+        for t in MonthID:
+            # print(f't:{t}, sum1: {sum(sol_df.loc[conflict_1, t])}, sum2: {sum(sol_df.loc[conflict_2, t])}')
+            if sum(sol_df.loc[conflict_1, t]) * sum(sol_df.loc[conflict_2, t]) != 0:
+                if conflict_1 in Conflict.loc[:j - 1].values:
+                    product_to_stay, product_to_delay = conflict_1, conflict_2
+                elif conflict_2 in Conflict.loc[:j - 1].values:
+                    product_to_stay, product_to_delay = conflict_2, conflict_1
+                elif sc_arr[conflict_1] >= sc_arr[conflict_2]:
+                    product_to_stay, product_to_delay = conflict_1, conflict_2
+                elif sc_arr[conflict_1] < sc_arr[conflict_2]:
+                    product_to_stay, product_to_delay = conflict_2, conflict_1
+                # print('--------------BEFORE----------')
+                # print(sol_df.loc[[conflict_1, conflict_2], [t, t + 1]])
                 for k in Shipping_method:
-                    print(conflict_1, t, k, sol_df.loc[conflict_1, (t, Letter[k])])
-                    # print(conflict_1, t + 1, k, sol_df.loc[conflict_1, (t + 1, Letter[k])])
-                    print(conflict_2, t, k, sol_df.loc[conflict_2, (t, Letter[k])])
-                    # print(conflict_2, t + 1, k, sol_df.loc[conflict_2, (t + 1, Letter[k])])
-                    print(t, k, sol_df.loc[conflict_1, (t, Letter[k])], sol_df.loc[conflict_2, (t, Letter[k])])
-                    print('=====')
-                    if sol_df.loc[conflict_1, (t, Letter[k])] * sol_df.loc[conflict_2, (t, Letter[k])] != 0:
-                        print(conflict_1, t, k,sol_df.loc[conflict_1, (t, Letter[k])])
-                        # print(conflict_1, t + 1, k, sol_df.loc[conflict_1, (t + 1, Letter[k])])
-                        print(conflict_2, t,k, sol_df.loc[conflict_2, (t, Letter[k])])
-                        # print(conflict_2, t+1,k,sol_df.loc[conflict_2, (t + 1, Letter[k])])
-                        print('---')
-                        if sc_arr[conflict_1] >= sc_arr[conflict_2]:  # 1的後加到前，2的前加到後
-                            sol_df.loc[conflict_1, (t, Letter[k])] += sol_df.loc[conflict_1, (t + 1, Letter[k])]
-                            sol_df.loc[conflict_1, (t + 1, Letter[k])] = 0
-                            sol_df.loc[conflict_2, (t + 1, Letter[k])] += sol_df.loc[conflict_2, (t, Letter[k])]
-                            sol_df.loc[conflict_2, (t, Letter[k])] = 0
-                        else:
-                            sol_df.loc[conflict_2, (t, Letter[k])] += sol_df.loc[conflict_2, (t + 1, Letter[k])]
-                            sol_df.loc[conflict_2, (t + 1, Letter[k])] = 0
-                            sol_df.loc[conflict_1, (t + 1, Letter[k])] += sol_df.loc[conflict_1, (t, Letter[k])]
-                            sol_df.loc[conflict_1, (t, Letter[k])] = 0
-                        print(conflict_1, t, k,sol_df.loc[conflict_1, (t, Letter[k])])
-                        # print(conflict_1, t + 1, k, sol_df.loc[conflict_1, (t + 1, Letter[k])])
-                        print(conflict_2, t,k, sol_df.loc[conflict_2, (t, Letter[k])])
-                        # print(conflict_1, t+1,k,sol_df.loc[conflict_2, (t + 1, Letter[k])])
-                        print('------------')
-'''
-    print('Lb check')
-    print('-------------------')
+                    sol_df.loc[product_to_stay, (t, Letter[k])] += sol_df.loc[product_to_stay, (t + 1, Letter[k])]
+                    sol_df.loc[product_to_stay, (t + 1, Letter[k])] = 0
+                    sol_df.loc[product_to_delay, (t + 1, Letter[k])] += sol_df.loc[product_to_delay, (t, Letter[k])]
+                    sol_df.loc[product_to_delay, (t, Letter[k])] = 0
+                    # if sc_arr[conflict_1] >= sc_arr[conflict_2]:  # 1的後加到前，2的前加到後
+                    #     sol_df.loc[conflict_1, (t, Letter[k])] += sol_df.loc[conflict_1, (t + 1, Letter[k])]
+                    #     sol_df.loc[conflict_1, (t + 1, Letter[k])] = 0
+                    #     sol_df.loc[conflict_2, (t + 1, Letter[k])] += sol_df.loc[conflict_2, (t, Letter[k])]
+                    #     sol_df.loc[conflict_2, (t, Letter[k])] = 0
+                    # else:
+                    #     sol_df.loc[conflict_2, (t, Letter[k])] += sol_df.loc[conflict_2, (t + 1, Letter[k])]
+                    #     sol_df.loc[conflict_2, (t + 1, Letter[k])] = 0
+                    #     sol_df.loc[conflict_1, (t + 1, Letter[k])] += sol_df.loc[conflict_1, (t, Letter[k])]
+                    #     sol_df.loc[conflict_1, (t, Letter[k])] = 0
+    #             print('----------AFTER-----------')
+    #             print(sol_df.loc[[conflict_1, conflict_2], [t, t + 1]])
+    #             print('------------')
+    # print('Lb check')
+    # print('-------------------')
     # for i in ProductID:
     #     for k in Shipping_method:
     #         for t in MonthID:
     #             if 0 < sol_df.loc[i, (t, Letter[k])] < Lb[i]:
     #                 print(i, k, t, Lb[i], sol_df.loc[i, (t, Letter[k])])
-    print('-------------------')
-    print('Conflict check')
-    print('-------------------')
-    for j in ConflictID:
-        conflict_1 = Conflict.loc[j, 'Product 1']
-        conflict_2 = Conflict.loc[j, 'Product 2']
-        print(f'conflict_1: {conflict_1}, conflict_2: {conflict_2}')
-        for t in MonthID:
-            print(f'month: {t}')
-            print(1, sol_df.loc[conflict_1, (t, 'E')], sol_df.loc[conflict_2, (t, 'E')])
-            print(2, sol_df.loc[conflict_1, (t, 'A')], sol_df.loc[conflict_2, (t, 'A')])
-            print(3, sol_df.loc[conflict_1, (t, 'O')], sol_df.loc[conflict_2, (t, 'O')])
-            # if sum(sol_df.loc[conflict_1, t]) * sum(sol_df.loc[conflict_2, t]) != 0:
-            #     print(f'!!!!!!!!!!!!!! {conflict_1}, {conflict_2} in month {t} !!!!!!!!!!!!!!!')
-    print('-------------------')
-'''
-'''
+    # print('-------------------')
+    # print('Conflict check')
+    # print('-------------------')
+    # for j in ConflictID:
+    #     conflict_1 = Conflict.loc[j, 'Product 1']
+    #     conflict_2 = Conflict.loc[j, 'Product 2']
+    #     # print(f'conflict_1: {conflict_1}, conflict_2: {conflict_2}')
+    #     for t in MonthID:
+    #         if sum(sol_df.loc[conflict_1, t]) * sum(sol_df.loc[conflict_2, t]) != 0:
+    #             print(f'!!!!!!!!!!!!!! {conflict_1}, {conflict_2} in month {t} !!!!!!!!!!!!!!!')
+    # print('-------------------')
+    # sol_df.to_excel('After.xlsx')
+
+
     # 模型的部分
     p2 = Model("p2")
+    p2.Params.LogToConsole = 0
     # Non-binary Variables
     x = p2.addVars(ProductID, Shipping_method, range(0, M + 1), lb=0, vtype=GRB.INTEGER, name='x')  # x[i, k, t]
     v = p2.addVars(ProductID, range(0, M + 1), lb=0, vtype= GRB.CONTINUOUS, name= 'v')  # 期末存貨 v[i, t]
@@ -323,8 +322,15 @@ for num in [5]:
     p2.addConstrs((quicksum(x.select(i, '*', t)) <= Total_demand * a[i, t]) for i in ProductID for t in MonthID)
 
     p2.optimize()
-
+    end = time.time()
     # print(f's{num}\'s objVal: {locale.currency(p2.objVal, grouping=True)}')
-    # print(f's{num}\'s z:, p2.objVal')
-    # print(f's{num}\'s gap: {100 * (p2.objVal - ariels[num - 1]) / ariels[num - 1]}%')
-'''
+    print(f's{num}\'s time: {end - start}')
+    print(f's{num}\'s z: {p2.objVal}')
+    print(f's{num}\'s gap: {100 * (p2.objVal - ariels[num - 1]) / ariels[num - 1]}%')
+    print('-------------')
+
+heuristic_algorithm(1)
+heuristic_algorithm(2)
+heuristic_algorithm(3)
+heuristic_algorithm(4)
+heuristic_algorithm(5)
