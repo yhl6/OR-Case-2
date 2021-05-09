@@ -162,11 +162,9 @@ for num in [2]:
 
     row_index = pd.Index([*range(1, N + 1)], name='Product')
     column_names = pd.MultiIndex.from_product([MonthID, ['E', 'A', 'O']], names=['Month', 'Method'])
-    # print(index)
-    # print(new_index)
-    sol_df = pd.DataFrame(np.nan, index=row_index, columns=column_names)
-    # sol_df = pd.DataFrame(np.nan, index=row_index, columns=index)
-    # sol_df.index.name = 'Product'
+    sol_df = pd.DataFrame(index=row_index, columns=column_names)
+    print(sol_df)
+
 
     for i in ProductID:
         for t in MonthID:
