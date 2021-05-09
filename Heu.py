@@ -5,7 +5,7 @@ import pandas as pd
 讀取資料
 '''
 for num in range(1, 6):
-    file_name = 'data/'+ f'OR109-2_case02_data_s{num}.xlsx'
+    file_name = 'data_new/'+ f'OR109-2_case02_data_s{num}.xlsx'
     df = pd.ExcelFile(file_name)
     Demand = pd.read_excel(df, sheet_name='Demand', index_col=0)
 
@@ -67,12 +67,14 @@ for num in range(1, 6):
     sc_arr = pd.Series(0, index=ProductID)
     Letter = {1: 'E', 2:'A', 3:'O'}
     for i in ProductID:
+        c1 = Express_delivery[i] + Holding_cost[i] * 2
+        c2 = Air_freight[i] + Holding_cost[i]
+        c3 = (Cubic_meter[i] / 0.5) * 1500
+        sc = Backorder[i] * Bo_percent[i] + Lost_sales[i] * (1 - Bo_percent[i])
+        if sc <= Purchasing_cost[i]:
+            break
+        sc_arr[i] = sc
         endinv = pd.Series(0, index=MonthID)
-        c1 = Express_delivery[i] + Holding_cost[i] * 2 + 100
-        c2 = Air_freight[i] + Holding_cost[i] + 80
-        c3 = (Cubic_meter[i] / 0.5) * 1500 + 50
-        sc_arr[i] = Backorder[i] * Bo_percent[i] + Lost_sales[i] * (1 - Bo_percent[i])
-        # sc_arr[i] = sc
         if (c1 <= c2) & (c1 <= c3):
             cost, method = c1 + Purchasing_cost[i], 1
         elif (c2 <= c1) & (c2 <= c3):

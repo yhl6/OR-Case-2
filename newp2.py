@@ -10,7 +10,8 @@ pd.set_option('display.max_columns', None, 'display.max_rows', None)
 '''
 讀取資料
 '''
-for num in [2]:
+val = []
+for num in range(1, 6):
     start = time.time()
     DATA_PATH = Path(__file__).resolve().parent / 'data'
     file_name = DATA_PATH / f'OR109-2_case02_data_s{num}.xlsx'
@@ -163,7 +164,7 @@ for num in [2]:
     row_index = pd.Index([*range(1, N + 1)], name='Product')
     column_names = pd.MultiIndex.from_product([MonthID, ['E', 'A', 'O']], names=['Month', 'Method'])
     sol_df = pd.DataFrame(index=row_index, columns=column_names)
-    print(sol_df)
+    # print(sol_df)
 
 
     for i in ProductID:
@@ -175,6 +176,8 @@ for num in [2]:
                     sol_df.loc[i, (t, 'A')] = x[i, k, t].x
                 elif k == 3:
                     sol_df.loc[i, (t, 'O')] = x[i, k, t].x
+    val.append(p2.objVal)
+print(val)
     # print(sol_df)
     # sol_df.to_excel(f'Result_{num}.xlsx', sheet_name='Ordering Plan')
     # for k in Shipping_method:
