@@ -1,11 +1,9 @@
-from gurobipy import *
+# from gurobipy import *
+from openpyxl import load_workbook
 import pandas as pd
-from pathlib import Path
 import time
-import locale
 
 # pd.set_option('display.max_columns', None, 'display.max_rows', None)
-# locale.setlocale( locale.LC_ALL, '' )
 ariels = [1292803813.469, 172446584.464, 581302506.955, 923810132.627, 1153418763.777]
 '''
 讀取資料
@@ -13,8 +11,6 @@ ariels = [1292803813.469, 172446584.464, 581302506.955, 923810132.627, 115341876
 
 def heuristic_algorithm(num):
     start = time.time()
-    # DATA_PATH = Path(__file__).resolve().parent / 'data'
-    # file_name = DATA_PATH / f'OR109-2_case02_data_s{num}.xlsx'
     file_name = 'data/'+ f'OR109-2_case02_data_s{num}.xlsx'
     df = pd.ExcelFile(file_name)
     Demand = pd.read_excel(df, sheet_name='Demand', index_col=0)
@@ -37,7 +33,7 @@ def heuristic_algorithm(num):
 
     # 售價、購買成本、持有成本
     Price_and_cost = pd.read_excel(df, sheet_name='Price and cost', index_col=0)
-    Sales = Price_and_cost['Sales price']
+    # Sales = Price_and_cost['Sales price']
     Purchasing_cost = Price_and_cost['Purchasing cost']
     Holding_cost = Price_and_cost['Holding cost']
 
@@ -49,30 +45,30 @@ def heuristic_algorithm(num):
 
     # 其他資料
     Vendor_product = pd.read_excel(df, sheet_name='Vendor-Product', index_col=0)
-    ProductID_grouped = Vendor_product.groupby('Vendor')
+    # ProductID_grouped = Vendor_product.groupby('Vendor')
 
     Vendor_cost = pd.read_excel(df, sheet_name='Vendor cost', index_col=0)
-    Ordering_cost = Vendor_cost['Ordering cost']
+    # Ordering_cost = Vendor_cost['Ordering cost']
 
     Bounds = pd.read_excel(df, sheet_name='Bounds', index_col=0)
     Lb = Bounds['Minimum order quantity (if an order is placed)']
     Conflict = pd.read_excel(df, sheet_name='Conflict', index_col=0)
-    Conflict_tl = tuplelist(zip(Conflict['Product 1'], Conflict['Product 2']))
-
-    Fixed_cost = [100, 80, 50]
+    # Conflict_tl = tuplelist(zip(Conflict['Product 1'], Conflict['Product 2']))
+    #
+    # Fixed_cost = [100, 80, 50]
 
     N, M = Demand.shape  # 產品數、月份數
-    R = Vendor_cost.shape[0]  # 供應商的數量
+    # R = Vendor_cost.shape[0]  # 供應商的數量
     J = Conflict.shape[0]  # 衝突的數量(共有幾種衝突)
 
     ProductID = range(1, N + 1)
     MonthID = range(1, M + 1)
     Shipping_method = range(1, 4)
-    VendorID = range(1, R + 1)
+    # VendorID = range(1, R + 1)
     ConflictID = range(1, J + 1)
 
     # TD[i] = Total demand for product i
-    Total_demand = sum(Demand.apply(lambda x: x.sum(), axis=1))
+    # Total_demand = sum(Demand.apply(lambda x: x.sum(), axis=1))
     row_index = pd.Index([*range(1, N + 1)], name='Product')
     column_names = pd.MultiIndex.from_product([MonthID, ['E', 'A', 'O']], names=['Month', 'Method'])
     sol_df = pd.DataFrame(0, index=row_index, columns=column_names)
@@ -179,6 +175,8 @@ def heuristic_algorithm(num):
                 # elif (Lb[i] >= Demand.loc[i, t + 1] + 100):  # 如果沒有低於下限很多就訂到下限(如果低於下限很多就乾脆不訂)
                 #     sol_df.loc[i, (t, 'E')] = Lb[i]
     # sol_df.to_excel('Before.xlsx')
+
+    # 處理衝突
     for j in ConflictID:
         conflict_1 = Conflict.loc[j, 'Product 1']
         conflict_2 = Conflict.loc[j, 'Product 2']
@@ -200,40 +198,9 @@ def heuristic_algorithm(num):
                     sol_df.loc[product_to_stay, (t + 1, Letter[k])] = 0
                     sol_df.loc[product_to_delay, (t + 1, Letter[k])] += sol_df.loc[product_to_delay, (t, Letter[k])]
                     sol_df.loc[product_to_delay, (t, Letter[k])] = 0
-                    # if sc_arr[conflict_1] >= sc_arr[conflict_2]:  # 1的後加到前，2的前加到後
-                    #     sol_df.loc[conflict_1, (t, Letter[k])] += sol_df.loc[conflict_1, (t + 1, Letter[k])]
-                    #     sol_df.loc[conflict_1, (t + 1, Letter[k])] = 0
-                    #     sol_df.loc[conflict_2, (t + 1, Letter[k])] += sol_df.loc[conflict_2, (t, Letter[k])]
-                    #     sol_df.loc[conflict_2, (t, Letter[k])] = 0
-                    # else:
-                    #     sol_df.loc[conflict_2, (t, Letter[k])] += sol_df.loc[conflict_2, (t + 1, Letter[k])]
-                    #     sol_df.loc[conflict_2, (t + 1, Letter[k])] = 0
-                    #     sol_df.loc[conflict_1, (t + 1, Letter[k])] += sol_df.loc[conflict_1, (t, Letter[k])]
-                    #     sol_df.loc[conflict_1, (t, Letter[k])] = 0
-    #             print('----------AFTER-----------')
-    #             print(sol_df.loc[[conflict_1, conflict_2], [t, t + 1]])
-    #             print('------------')
-    # print('Lb check')
-    # print('-------------------')
-    # for i in ProductID:
-    #     for k in Shipping_method:
-    #         for t in MonthID:
-    #             if 0 < sol_df.loc[i, (t, Letter[k])] < Lb[i]:
-    #                 print(i, k, t, Lb[i], sol_df.loc[i, (t, Letter[k])])
-    # print('-------------------')
-    # print('Conflict check')
-    # print('-------------------')
-    # for j in ConflictID:
-    #     conflict_1 = Conflict.loc[j, 'Product 1']
-    #     conflict_2 = Conflict.loc[j, 'Product 2']
-    #     # print(f'conflict_1: {conflict_1}, conflict_2: {conflict_2}')
-    #     for t in MonthID:
-    #         if sum(sol_df.loc[conflict_1, t]) * sum(sol_df.loc[conflict_2, t]) != 0:
-    #             print(f'!!!!!!!!!!!!!! {conflict_1}, {conflict_2} in month {t} !!!!!!!!!!!!!!!')
-    # print('-------------------')
-    # sol_df.to_excel('After.xlsx')
-
-
+    end = time.time()
+    print(f'{num}\'s: {end - start}')
+'''
     # 模型的部分
     p2 = Model("p2")
     p2.Params.LogToConsole = 0
@@ -254,17 +221,6 @@ def heuristic_algorithm(num):
     p2.update()
 
     # 目標式
-    print(sol_df['Method' == 'E'])
-    # p2.setObjective(
-    #     quicksum(Express_delivery[i] * quicksum(x.select(i, 1, '*')) for i in ProductID)  # 陸運變動成本
-    #     + quicksum(Air_freight[i] * quicksum(x.select(i, 2, '*')) for i in ProductID)  # 空運變動成本
-    #     + quicksum(Fixed_cost[k - 1] * quicksum(z.select(k, '*')) for k in Shipping_method)  # 固定成本
-    #     + quicksum(Purchasing_cost[i] * quicksum(x.select(i, '*', '*')) for i in ProductID)  # 購買成本
-    #     + quicksum(Holding_cost[i] * quicksum(v[i, t] for t in MonthID) for i in ProductID)  # 倉儲成本
-    #     + 1500 * quicksum(g.select())  # 貨櫃成本
-    #     + quicksum(quicksum(Lost_sales[i] * s[i, t] * (1 - Bo_percent[i]) for i in ProductID) for t in MonthID)  # Lost sales cost
-    #     + quicksum(quicksum(Backorder[i] * Bo_percent[i] * s[i, t] for i in ProductID) for t in MonthID)  # Backorder cost
-    #     + quicksum(Ordering_cost[r] * quicksum(o[r, t] for t in MonthID) for r in VendorID), GRB.MINIMIZE)  # Vendor cost
     p2.setObjective(
         quicksum(Express_delivery[i] * quicksum(x.select(i, 1, '*')) for i in ProductID)  # 陸運變動成本
         + quicksum(Air_freight[i] * quicksum(x.select(i, 2, '*')) for i in ProductID)  # 空運變動成本
@@ -339,7 +295,7 @@ def heuristic_algorithm(num):
     print(f's{num}\'s z: {p2.objVal}')
     print(f's{num}\'s gap: {100 * (p2.objVal - ariels[num - 1]) / ariels[num - 1]}%')
     print('-------------')
-
+'''
 heuristic_algorithm(1)
 heuristic_algorithm(2)
 heuristic_algorithm(3)
